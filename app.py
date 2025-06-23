@@ -38,6 +38,12 @@ def tratar_valor_numerico(valor):
     except:
         return 0
 
+def format_inteiro(valor):
+    try:
+        return f"{int(valor):,}".replace(",", ".")
+    except:
+        return "0"
+
 class RelatorioPDF(FPDF):
     def header(self):
         self.set_fill_color(155, 106, 250)
@@ -79,9 +85,9 @@ class RelatorioPDF(FPDF):
         self.set_font("Arial", "B", 14)
         self.cell(0, 8, "Total de pedidos referente ao mês anterior", ln=True, align="C")
         self.set_font("Arial", "", 11)
-        self.cell(0, 7, f"{tratar_valor_numerico(row['Número de vendas'])} pedidos", ln=True, align="C")
+        self.cell(0, 7, f"{format_inteiro(tratar_valor_numerico(row['Número de vendas']))} pedidos", ln=True, align="C")
         self.cell(0, 6,
-                  f"Cartão: {tratar_valor_numerico(row['Pedidos de Cartão'])}  |  PIX: {tratar_valor_numerico(row['Pedidos de PIX'])}  |  Boleto: {tratar_valor_numerico(row['Pedidos Boleto'])}",
+                  f"Cartão: {format_inteiro(tratar_valor_numerico(row['Pedidos de Cartão']))}  |  PIX: {format_inteiro(tratar_valor_numerico(row['Pedidos de PIX']))}  |  Boleto: {format_inteiro(tratar_valor_numerico(row['Pedidos Boleto']))}",
                   ln=True, align="C")
 
         self.ln(8)
