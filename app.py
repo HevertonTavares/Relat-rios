@@ -1,18 +1,42 @@
+
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from fpdf import FPDF
-import os
 from tempfile import NamedTemporaryFile
 
 st.set_page_config(page_title="Gerador de Relatórios PDF", layout="centered")
 st.title("Gerador de Relatórios PDF por Loja")
-st.write("Faça o upload da planilha consolidada para gerar os relatórios.")
 
 uploaded_file = st.file_uploader("Envie a planilha .xlsx", type=["xlsx"])
-logo_path = "Appmax.png"  # nome padrão do logo na mesma pasta do app
+logo_path = "Appmax.png"
 
 def format_currency(value):
     return f"R${value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+def tratar_valor_percentual(valor):
+    if pd.isna(valor):
+        return 0.0
+    if isinstance(valor, str):
+        valor = valor.replace("%", "").strip().replace(",", ".")
+        try:
+            return float(valor) / 100 if float(valor) > 1 else float(valor)
+        except:
+            return 0.0
+    try:
+        return float(valor)
+    except:
+        return 0.0
+
+def tratar_valor_numerico(valor):
+    if pd.isna(valor):
+        return 0
+    if isinstance(valor, str):
+        valor = valor.strip().replace("R$", "").replace(".", "").replace(",", ".")
+    try:
+        return int(float(valor))
+    except:
+        return 0
 
 class RelatorioPDF(FPDF):
     def header(self):
@@ -20,7 +44,7 @@ class RelatorioPDF(FPDF):
         self.rect(0, 0, 210, 297, 'F')
         self.set_text_color(255, 255, 255)
 
-    def render(self, row, grafico_pagamento_path, logo_path):
+    def render(self, row, grafico_path, logo_path):
         self.set_text_color(255, 255, 255)
         self.set_font("Arial", "B", 18)
         self.set_y(15)
@@ -48,25 +72,24 @@ class RelatorioPDF(FPDF):
 
         self.set_x(x)
         self.set_font("Arial", "B", 12)
-        self.cell(w / 2, 8, f"{int(row['Taxa Aprovação cartão'] * 100)}%", align="C")
-        self.cell(w / 2, 8, f"{int(row['Taxa Aprovação PIX'] * 100)}%", align="C", ln=True)
+        self.cell(w / 2, 8, f"{int(tratar_valor_percentual(row['Taxa Aprovação cartão']) * 100)}%", align="C")
+        self.cell(w / 2, 8, f"{int(tratar_valor_percentual(row['Taxa Aprovação PIX']) * 100)}%", align="C", ln=True)
 
         self.ln(14)
         self.set_font("Arial", "B", 14)
         self.cell(0, 8, "Total de pedidos referente ao mês anterior", ln=True, align="C")
         self.set_font("Arial", "", 11)
-        self.cell(0, 7, f"{int(row['Número de vendas'])} pedidos", ln=True, align="C")
+        self.cell(0, 7, f"{tratar_valor_numerico(row['Número de vendas'])} pedidos", ln=True, align="C")
         self.cell(0, 6,
-                  f"Cartão: {int(row['Pedidos de Cartão'])}  |  PIX: {int(row['Pedidos de PIX'])}  |  Boleto: {int(row['Pedidos Boleto'])}",
+                  f"Cartão: {tratar_valor_numerico(row['Pedidos de Cartão'])}  |  PIX: {tratar_valor_numerico(row['Pedidos de PIX'])}  |  Boleto: {tratar_valor_numerico(row['Pedidos Boleto'])}",
                   ln=True, align="C")
 
         self.ln(8)
         self.set_font("Arial", "B", 14)
-        self.cell(0, 8, f"Valor processado em 30 dias: {format_currency(row['Processamento 30 dias'])}", ln=True,
-                  align="C")
+        self.cell(0, 8, f"Valor processado em 30 dias: {format_currency(tratar_valor_numerico(row['Processamento 30 dias']))}", ln=True, align="C")
 
         self.ln(8)
-        self.image(grafico_pagamento_path, x=60, w=90)
+        self.image(grafico_path, x=60, w=90)
 
         self.ln(5)
         self.set_font("Arial", "B", 14)
@@ -78,9 +101,9 @@ class RelatorioPDF(FPDF):
         row_h = 9
         headers = ["Carrinho Abandonado", "Recuperação Banco Emissor", "Custo envios disparos"]
         valores = [
-            format_currency(row['Recuperação de Carrinho']),
-            format_currency(row['Recuperação Banco Emissor']),
-            format_currency(row['Custo de envios'])
+            format_currency(tratar_valor_numerico(row['Recuperação de Carrinho'])),
+            format_currency(tratar_valor_numerico(row['Recuperação Banco Emissor'])),
+            format_currency(tratar_valor_numerico(row['Custo de envios']))
         ]
 
         self.set_draw_color(255, 255, 255)
@@ -104,11 +127,14 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
     def gerar_grafico(row):
-        import matplotlib.pyplot as plt
-        fig, ax = plt.subplots(figsize=(4, 4), facecolor='#9B6AFA')
-        valores = [row['Pedidos de Cartão'], row['Pedidos de PIX'], row['Pedidos Boleto']]
+        valores = [
+            tratar_valor_numerico(row['Pedidos de Cartão']),
+            tratar_valor_numerico(row['Pedidos de PIX']),
+            tratar_valor_numerico(row['Pedidos Boleto'])
+        ]
         labels = ['Cartão', 'PIX', 'Boleto']
         cores = ['#FFCCFF', '#CCFFFF', '#3399FF']
+        fig, ax = plt.subplots(figsize=(4, 4), facecolor='#9B6AFA')
         ax.pie(valores, labels=labels, colors=cores, autopct='%1.1f%%', startangle=90,
                textprops={'color': 'white'})
         ax.axis('equal')
